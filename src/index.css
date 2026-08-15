@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
+    --card: 220 30% 7%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 30% 7%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 192 91% 52%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 215 28% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 215 28% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 239 84% 67%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    border-color: #1E2D3D;
+  }
+  body {
+    @apply bg-bg-base text-text-primary font-sans antialiased;
+    background-color: #070A0F;
+    color: #F1F5F9;
+  }
+  ::selection {
+    background: rgba(99, 102, 241, 0.3);
+    color: #F1F5F9;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0D1117;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #243447;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-bg-surface/80 backdrop-blur-md border border-border-subtle;
+  }
+  .glass-elevated {
+    @apply bg-bg-elevated/90 backdrop-blur-md border border-border-default;
+  }
+  .memora-card {
+    @apply glass-panel rounded-xl p-6 transition-all duration-300;
+  }
+  .memora-card:hover {
+    @apply border-border-strong shadow-card-hover;
+  }
+  .btn-primary {
+    @apply bg-brand-primary hover:bg-brand-primary-light text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-primary/50;
+  }
+  .btn-secondary {
+    @apply border border-brand-primary/50 text-brand-primary-light hover:bg-brand-primary/10 font-medium px-6 py-3 rounded-xl transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply text-text-secondary hover:text-text-primary hover:bg-bg-elevated font-medium px-4 py-2 rounded-lg transition-all duration-200;
+  }
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-all duration-200 font-medium;
+  }
+  .nav-link.active {
+    @apply bg-brand-primary/10 text-brand-primary-light border border-brand-primary/20;
+  }
+  .stat-value {
+    @apply font-mono text-2xl font-bold text-text-primary;
+  }
+  .stat-label {
+    @apply text-xs font-medium text-text-muted uppercase tracking-widest;
+  }
+  .risk-low {
+    @apply text-status-success bg-status-success/10 border-status-success/20;
+  }
+  .risk-medium {
+    @apply text-status-warning bg-status-warning/10 border-status-warning/20;
+  }
+  .risk-high {
+    @apply text-status-danger bg-status-danger/10 border-status-danger/20;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border;
+  }
+  .input-field {
+    @apply w-full bg-bg-elevated border border-border-default text-text-primary placeholder-text-muted rounded-xl px-4 py-3 focus:outline-none focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/25 transition-colors;
+  }
+  .section-heading {
+    @apply text-lg font-semibold text-text-primary;
+  }
+  .demo-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-status-warning/10 text-status-warning border border-status-warning/30;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-primary-light via-brand-secondary to-brand-secondary bg-clip-text text-transparent;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .animate-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .glow-border-primary {
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+  }
+  .glow-border-secondary {
+    border-color: rgba(34, 211, 238, 0.5);
+    box-shadow: 0 0 15px rgba(34, 211, 238, 0.2);
+  }
+}
