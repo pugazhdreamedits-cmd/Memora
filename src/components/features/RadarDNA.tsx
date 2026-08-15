@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, Tooltip
@@ -17,6 +17,15 @@ export default function RadarDNA({ profile }: Props) {
     { metric: "Consistency", value: profile.consistency, fullMark: 100 },
     { metric: "Forgetting Resistance", value: 100 - profile.forgettingSpeed, fullMark: 100 },
   ];
+
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handler = () => setPrefersReducedMotion(mq.matches);
+    handler();
+    mq.addEventListener?.('change', handler);
+    return () => mq.removeEventListener?.('change', handler);
+  }, []);
 
   return (
     <ResponsiveContainer width="100%" height={320}>
@@ -44,6 +53,8 @@ export default function RadarDNA({ profile }: Props) {
           stroke="#6366F1"
           fill="url(#radarGrad)"
           strokeWidth={2}
+          isAnimationActive={!prefersReducedMotion}
+          animationDuration={800}
         />
       </RadarChart>
     </ResponsiveContainer>

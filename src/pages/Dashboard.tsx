@@ -7,6 +7,7 @@ import { buildMemoryProfile } from "@/lib/memoryProfile";
 import MemoryCore from "@/components/features/MemoryCore";
 import TopicNode from "@/components/features/TopicNode";
 import RetentionBadge from "@/components/features/RetentionBadge";
+import InsightPanel from "@/components/features/InsightPanel";
 import { getRiskBgColor, timeAgo, round, cn } from "@/lib/utils";
 import { useSimulatedDays } from "@/hooks/useSimulatedDays";
 
@@ -240,6 +241,10 @@ export default function Dashboard() {
                 </div>
               </Link>
             ))}
+          </div>
+          {/* Intelligence Panel */}
+          <div>
+            <InsightPanel />
           </div>
         </div>
       )}

@@ -102,6 +102,74 @@ export interface MLDataPoint {
   forgettingRisk: number; // 0=LOW,1=MEDIUM,2=HIGH
 }
 
+// ─── Syllabus / Academic Types ─────────────────────────────────
+export interface TopicEntry {
+  id: string;
+  title: string;
+}
+
+export interface UnitEntry {
+  id: string;
+  unit: string; // e.g., "Unit I"
+  topics: TopicEntry[];
+}
+
+export interface SubjectEntry {
+  code?: string;
+  name: string;
+  units: UnitEntry[];
+}
+
+export interface SyllabusDocument {
+  university: string;
+  regulation?: string;
+  degree?: string;
+  branch?: string;
+  semester?: number;
+  subjects: SubjectEntry[];
+  meta?: Record<string, any>;
+}
+
+// ─── AI / Question Generation Types ────────────────────────────
+export type QuestionType =
+  | "MCQ"
+  | "TrueFalse"
+  | "FillBlank"
+  | "ShortAnswer"
+  | "Descriptive"
+  | "Numerical"
+  | "Programming";
+
+export type BloomLevel = "Remember" | "Understand" | "Apply" | "Analyze" | "Evaluate" | "Create";
+
+export interface AIQuestion {
+  id: string;
+  question: string;
+  options?: string[];
+  correctAnswer?: string;
+  explanation?: string;
+  difficulty?: "Easy" | "Medium" | "Hard";
+  subject?: string;
+  unit?: string;
+  topic?: string;
+  questionType?: QuestionType;
+  bloom?: BloomLevel;
+}
+
+export interface AIQuestionRequest {
+  university: string;
+  regulation?: string;
+  degree?: string;
+  branch?: string;
+  semester?: number;
+  subject: string;
+  unit?: string;
+  topic: string;
+  difficulty?: "Easy" | "Medium" | "Hard";
+  questionType?: QuestionType;
+  count?: number;
+}
+
 export interface ModelMetrics {
   name: string;
   accuracy: number;

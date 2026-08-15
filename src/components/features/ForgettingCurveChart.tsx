@@ -13,6 +13,7 @@ interface DataPoint {
 interface Props {
   data: DataPoint[];
   title?: string;
+  recommendedLabel?: string | null;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -33,7 +34,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export default function ForgettingCurveChart({ data, title }: Props) {
+export default function ForgettingCurveChart({ data, title, recommendedLabel = null }: Props) {
   return (
     <div className="w-full">
       {title && <p className="text-sm font-medium text-text-secondary mb-4">{title}</p>}
@@ -43,6 +44,10 @@ export default function ForgettingCurveChart({ data, title }: Props) {
             <linearGradient id="predGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#6366F1" stopOpacity={0.3} />
               <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="predGlow" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#6366F1" stopOpacity={0.25} />
+              <stop offset="100%" stopColor="#22D3EE" stopOpacity={0.25} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -54,10 +59,26 @@ export default function ForgettingCurveChart({ data, title }: Props) {
           />
           <ReferenceLine y={80} stroke="#10B981" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: "LOW", fill: "#10B981", fontSize: 10, position: "right" }} />
           <ReferenceLine y={50} stroke="#F59E0B" strokeDasharray="4 4" strokeOpacity={0.4} label={{ value: "MED", fill: "#F59E0B", fontSize: 10, position: "right" }} />
+          {/* Predicted curve with soft glow */}
           <Area type="monotone" dataKey="predicted" fill="url(#predGrad)" stroke="#6366F1" strokeWidth={2} name="Predicted" dot={false} />
+          <Line type="monotone" dataKey="predicted" stroke="url(#predGlow)" strokeWidth={2.5} strokeDasharray="6 6" name="Predicted (trend)" dot={false} />
+          {/* Actual points (sparse) */}
           <Line type="monotone" dataKey="actual" stroke="#22D3EE" strokeWidth={2.5} name="Actual" dot={{ r: 4, fill: "#22D3EE", strokeWidth: 0 }} connectNulls={false} />
+
+          {/* Highlight recommended revision window if label provided */}
+          {/** recommendedLabel should match one of the data.label values (e.g., 'Now', '+1d') **/}
+          {/** We'll render a translucent ReferenceArea from 'Now' to recommendedLabel if available **/}
+          {recommendedLabel && data.some(d => d.label === recommendedLabel) && (
+            <ReferenceArea x1={data[0].label} x2={recommendedLabel} strokeOpacity={0} fill="#6366F140" />
+          )}
         </ComposedChart>
       </ResponsiveContainer>
+      {recommendedLabel && (
+        <div className="mt-3 flex items-center gap-3">
+          <div className="px-3 py-2 rounded-lg bg-brand-primary/10 text-brand-primary-light font-semibold">OPTIMAL REVISION WINDOW</div>
+          <div className="text-sm text-text-muted">Target: <span className="font-medium text-text-primary">{recommendedLabel}</span></div>
+        </div>
+      )}
     </div>
   );
 }

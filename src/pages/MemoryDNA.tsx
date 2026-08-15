@@ -40,8 +40,8 @@ export default function MemoryDNA() {
       {!hasData ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <Dna className="w-12 h-12 text-text-muted mb-4" />
-          <h2 className="text-xl font-bold text-text-primary mb-2">Not enough data yet.</h2>
-          <p className="text-text-secondary max-w-md mb-6">Complete more recall sessions to unlock your Memory DNA profile.</p>
+          <h2 className="text-xl font-bold text-text-primary mb-2">YOUR MEMORY DNA IS STILL FORMING</h2>
+          <p className="text-text-secondary max-w-md mb-6">Complete more study and recall sessions to reveal your personal pattern.</p>
           <Link to="/study" className="btn-primary">Start a Session</Link>
         </div>
       ) : (

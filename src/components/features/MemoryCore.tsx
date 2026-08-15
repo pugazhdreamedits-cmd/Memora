@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useMemo } from "react";
 import { cn, getRiskColor } from "@/lib/utils";
 import type { RiskLevel } from "@/types";
 
@@ -11,125 +11,122 @@ interface Props {
 }
 
 export default function MemoryCore({ retention, risk, stability, consistency, size = 220 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>(0);
-  const timeRef = useRef(0);
+  const mainColor = useMemo(() => (risk === "LOW" ? "#6366F1" : risk === "MEDIUM" ? "#F59E0B" : "#EF4444"), [risk]);
+  const accent = "#22D3EE"; // cyan accent
 
-  const riskColor = getRiskColor(risk);
-  const mainColor = risk === "LOW" ? "#10B981" : risk === "MEDIUM" ? "#F59E0B" : "#EF4444";
-  const secondaryColor = "#6366F1";
+  const insufficient = retention <= 0 && stability <= 0 && consistency <= 0;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d")!;
-    const W = size;
-    const H = size;
-    const cx = W / 2;
-    const cy = H / 2;
-    const r = (W / 2) * 0.72;
+  const coreState = retention >= 80 ? "stable" : retention >= 50 ? "medium" : "low";
 
-    function draw(t: number) {
-      ctx.clearRect(0, 0, W, H);
-
-      // Background circle
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.1, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(13, 17, 23, 0.95)";
-      ctx.fill();
-
-      // Outer ring glow
-      const glowGrad = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r * 1.15);
-      glowGrad.addColorStop(0, "transparent");
-      glowGrad.addColorStop(1, `${mainColor}18`);
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.15, 0, Math.PI * 2);
-      ctx.fillStyle = glowGrad;
-      ctx.fill();
-
-      // Track ring
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,255,255,0.05)";
-      ctx.lineWidth = 10;
-      ctx.stroke();
-
-      // Retention arc
-      const startAngle = -Math.PI / 2;
-      const endAngle = startAngle + (Math.PI * 2 * (retention / 100));
-      const arcGrad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
-      arcGrad.addColorStop(0, secondaryColor);
-      arcGrad.addColorStop(1, mainColor);
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, startAngle, endAngle);
-      ctx.strokeStyle = arcGrad;
-      ctx.lineWidth = 10;
-      ctx.lineCap = "round";
-      ctx.stroke();
-
-      // Stability inner ring
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.78, startAngle, startAngle + Math.PI * 2 * (stability / 100));
-      ctx.strokeStyle = `${secondaryColor}60`;
-      ctx.lineWidth = 5;
-      ctx.lineCap = "round";
-      ctx.stroke();
-
-      // Consistency dots
-      const numDots = 12;
-      for (let i = 0; i < numDots; i++) {
-        const angle = (i / numDots) * Math.PI * 2 - Math.PI / 2 + t * 0.0003;
-        const filled = i < Math.round((consistency / 100) * numDots);
-        const dx = cx + Math.cos(angle) * r * 0.58;
-        const dy = cy + Math.sin(angle) * r * 0.58;
-        ctx.beginPath();
-        ctx.arc(dx, dy, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = filled ? `${mainColor}cc` : "rgba(255,255,255,0.08)";
-        ctx.fill();
-      }
-
-      // Center value
-      ctx.fillStyle = "#F1F5F9";
-      ctx.font = `bold ${Math.floor(size * 0.18)}px Inter, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${Math.round(retention)}%`, cx, cy - 6);
-
-      ctx.fillStyle = "#94A3B8";
-      ctx.font = `${Math.floor(size * 0.065)}px Inter, sans-serif`;
-      ctx.letterSpacing = "2px";
-      ctx.fillText("RETENTION", cx, cy + Math.floor(size * 0.12));
-
-      // Pulsing center dot
-      const pulseR = 4 + Math.sin(t * 0.002) * 2;
-      const pulseGrad = ctx.createRadialGradient(cx, cy - size * 0.13, 0, cx, cy - size * 0.13, pulseR * 2);
-      pulseGrad.addColorStop(0, mainColor);
-      pulseGrad.addColorStop(1, "transparent");
-      ctx.beginPath();
-      ctx.arc(cx, cy - size * 0.13, pulseR, 0, Math.PI * 2);
-      ctx.fillStyle = pulseGrad;
-      ctx.fill();
-    }
-
-    function animate(t: number) {
-      timeRef.current = t;
-      draw(t);
-      animRef.current = requestAnimationFrame(animate);
-    }
-
-    animRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [retention, risk, stability, consistency, size, mainColor, secondaryColor]);
+  const radius = size / 2;
+  const viewBox = `0 0 ${size} ${size}`;
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <canvas
-        ref={canvasRef}
-        width={size}
-        height={size}
-        className="rounded-full"
-        style={{ filter: `drop-shadow(0 0 20px ${mainColor}30)` }}
-      />
+    <div
+      className={cn("relative flex items-center justify-center", insufficient && "opacity-80")}
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={insufficient ? "Memory profile forming" : `Overall retention ${Math.round(retention)} percent; risk ${risk}`}
+    >
+      <svg viewBox={viewBox} width={size} height={size} className="rounded-full" aria-hidden={false}>
+        <defs>
+          <radialGradient id="coreGlow" cx="50%" cy="40%" r="60%">
+            <stop offset="0%" stopColor={mainColor} stopOpacity={0.9} />
+            <stop offset="60%" stopColor={mainColor} stopOpacity={0.12} />
+            <stop offset="100%" stopColor="transparent" stopOpacity={0} />
+          </radialGradient>
+          <radialGradient id="accentGlow" cx="30%" cy="70%" r="60%">
+            <stop offset="0%" stopColor={accent} stopOpacity={0.7} />
+            <stop offset="70%" stopColor={accent} stopOpacity={0.06} />
+            <stop offset="100%" stopColor="transparent" stopOpacity={0} />
+          </radialGradient>
+          <filter id="softBlur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="6" result="blur" />
+            <feBlend in="SourceGraphic" in2="blur" mode="screen" />
+          </filter>
+        </defs>
+
+        {/* Dark glass background circle */}
+        <circle cx={radius} cy={radius} r={radius * 0.9} fill="rgba(10,12,15,0.65)" stroke="rgba(36,52,71,0.5)" strokeWidth="1" />
+
+        {/* Outer orbital rings (3) */}
+        <g className="orbital-group" style={{ transformOrigin: `${radius}px ${radius}px` }}>
+          <ellipse cx={radius} cy={radius} rx={radius * 0.85} ry={radius * 0.6} fill="none" stroke={`rgba(99,102,241,0.06)`} strokeWidth={1} />
+          <ellipse cx={radius} cy={radius} rx={radius * 0.65} ry={radius * 0.45} fill="none" stroke={`rgba(34,211,238,0.04)`} strokeWidth={1} />
+          <ellipse cx={radius} cy={radius} rx={radius * 0.45} ry={radius * 0.32} fill="none" stroke={`rgba(99,102,241,0.03)`} strokeWidth={1} />
+        </g>
+
+        {/* Neural nodes scattered on rings */}
+        <g className="nodes" aria-hidden>
+          {[...Array(10)].map((_, i) => {
+            const angle = (i / 10) * Math.PI * 2;
+            const r = radius * (0.5 + (i % 3) * 0.12);
+            const x = radius + Math.cos(angle) * r;
+            const y = radius + Math.sin(angle) * r;
+            const active = i < Math.round((consistency / 100) * 10);
+            return (
+              <circle key={i} cx={x} cy={y} r={active ? 3.4 : 2.2} fill={active ? mainColor : "rgba(255,255,255,0.06)"} opacity={active ? 1 : 0.8} />
+            );
+          })}
+        </g>
+
+        {/* Central glowing core */}
+        <g className={cn("core-group", coreState)}>
+          <circle cx={radius} cy={radius} r={radius * 0.28} fill="url(#coreGlow)" filter="url(#softBlur)" />
+          <circle cx={radius} cy={radius} r={radius * 0.18} fill="rgba(7,8,11,0.9)" stroke={mainColor} strokeOpacity={0.18} strokeWidth={1} />
+
+          {/* Retention numeric */}
+          {!insufficient ? (
+            <g className="label-group" aria-hidden>
+              <text x={radius} y={radius - 6} textAnchor="middle" fill="#F1F5F9" fontWeight={700} fontSize={Math.max(18, size * 0.14)} fontFamily="Inter, sans-serif">
+                {Math.round(retention)}%
+              </text>
+              <text x={radius} y={radius + Math.max(18, size * 0.05)} textAnchor="middle" fill="#94A3B8" fontSize={Math.max(10, size * 0.05)} fontFamily="Inter, sans-serif">
+                RETENTION
+              </text>
+            </g>
+          ) : (
+            <g className="label-group" aria-hidden>
+              <text x={radius} y={radius - 6} textAnchor="middle" fill="#F1F5F9" fontWeight={600} fontSize={Math.max(12, size * 0.11)} fontFamily="Inter, sans-serif">
+                Memory profile
+              </text>
+              <text x={radius} y={radius + Math.max(18, size * 0.05)} textAnchor="middle" fill="#94A3B8" fontSize={Math.max(10, size * 0.045)} fontFamily="Inter, sans-serif">
+                forming
+              </text>
+            </g>
+          )}
+        </g>
+
+        {/* Accent glow */}
+        <circle cx={radius * 0.72} cy={radius * 1.1} r={radius * 0.7} fill="url(#accentGlow)" opacity={0.7} />
+      </svg>
+
+      {/* Hover overlay with stability and risk */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <div className="opacity-0 hover:opacity-100 pointer-events-auto transition-opacity duration-200 text-center" role="status" aria-hidden={insufficient}>
+          {!insufficient && (
+            <div className="bg-bg-elevated/70 glass-panel px-3 py-2 rounded-xl text-xs">
+              <div className="font-semibold text-text-primary">{risk} — {coreState.toUpperCase()}</div>
+              <div className="text-text-muted text-xs">Stability {Math.round(stability)}% · Consistency {Math.round(consistency)}%</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        .orbital-group { animation: orbit 20s linear infinite; }
+        .nodes { transform-origin: ${radius}px ${radius}px; animation: rotateNodes 14s linear infinite reverse; }
+        .core-group.stable { animation: none; }
+        .core-group.medium { animation: pulse 3s ease-in-out infinite; }
+        .core-group.low { animation: pulse 2s ease-in-out infinite; filter: saturate(0.6) brightness(0.9); }
+        @keyframes orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes rotateNodes { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.02); opacity: 0.95; } 100% { transform: scale(1); opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) {
+          .orbital-group, .nodes, .core-group.medium, .core-group.low { animation: none !important; }
+        }
+        .label-group { pointer-events: none; }
+      `}</style>
     </div>
   );
 }

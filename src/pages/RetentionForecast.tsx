@@ -80,6 +80,14 @@ export default function RetentionForecast() {
     { label: "+14d", actual: null, predicted: data.prediction.retention14d },
   ] : [];
 
+  const recommendedLabel = data ? (
+    data.prediction.recommendedRevisionDays === 0 ? 'Now' :
+    data.prediction.recommendedRevisionDays === 1 ? '+1d' :
+    data.prediction.recommendedRevisionDays === 3 ? '+3d' :
+    data.prediction.recommendedRevisionDays === 7 ? '+7d' :
+    data.prediction.recommendedRevisionDays === 14 ? '+14d' : null
+  ) : null;
+
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <div className="mb-8">
@@ -136,7 +144,7 @@ export default function RetentionForecast() {
               })}
             </div>
 
-            <ForgettingCurveChart data={chartData} />
+            <ForgettingCurveChart data={chartData} recommendedLabel={recommendedLabel} />
           </div>
 
           {/* Recommendation */}

@@ -5,6 +5,7 @@ import { RetentionStore, StudyStore, MLStore } from "@/lib/storage";
 import { buildMemoryProfile } from "@/lib/memoryProfile";
 import { round, timeAgo } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import InsightPanel from "@/components/features/InsightPanel";
 
 interface Insight {
   type: "positive" | "warning" | "info";
@@ -129,6 +130,9 @@ export default function Insights() {
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+      <div className="mb-6">
+        <InsightPanel />
+      </div>
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
           <Lightbulb className="w-6 h-6 text-brand-primary-light" />

@@ -36,12 +36,14 @@ export function predictRetentionCurve(
   difficulty: number,
   studyMethod: number,
   revisionCount: number,
-  days: number[] = RECALL_DAYS
+  days: number[] = RECALL_DAYS,
+  demo = false
 ): number[] {
   const stability = calculateStability(initialScore, difficulty, studyMethod, revisionCount);
   return days.map(d => {
     const base = ebbinghausRetention(stability, d);
-    const noise = (Math.random() - 0.5) * 3; // slight variation
+    // In demo mode we add slight synthetic variation for visualization only.
+    const noise = demo ? (Math.random() - 0.5) * 3 : 0;
     return clamp(base + noise, 0, 100);
   });
 }

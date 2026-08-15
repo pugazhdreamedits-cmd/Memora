@@ -9,6 +9,29 @@ import { clamp, round } from "@/lib/utils";
 import { getRiskLevel } from "@/lib/utils";
 import { ebbinghausRetention, calculateStability, personalizedDecayRate } from "@/lib/retention";
 
+// Reproducible RNG for deterministic training/evaluation
+// Simple mulberry32 PRNG
+function mulberry32(a: number) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+const DEFAULT_SEED = 42;
+
+function seededShuffle<T>(arr: T[], seed = DEFAULT_SEED): T[] {
+  const a = [...arr];
+  const rand = mulberry32(seed);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // ─── Feature Encoding ────────────────────────────────────────
 export function encodeFeatures(d: MLDataPoint): number[] {
   return [
@@ -86,10 +109,11 @@ class DecisionTree {
     this.minSamples = minSamples;
   }
 
-  private gini(y: number[]): number {
+  // For regression trees we use variance (MSE) reduction as split criterion.
+  private variance(y: number[]): number {
     if (y.length === 0) return 0;
-    const count = y.reduce((s, v) => { s[v] = (s[v] || 0) + 1; return s; }, {} as Record<number, number>);
-    return 1 - Object.values(count).reduce((s, c) => s + (c / y.length) ** 2, 0);
+    const mean = y.reduce((a, b) => a + b, 0) / y.length;
+    return y.reduce((s, v) => s + (v - mean) ** 2, 0) / y.length;
   }
 
   private mean(y: number[]): number {
@@ -106,7 +130,11 @@ class DecisionTree {
         const leftY = y.filter((_, i) => X[i][f] <= thresh);
         const rightY = y.filter((_, i) => X[i][f] > thresh);
         if (leftY.length === 0 || rightY.length === 0) continue;
-        const gain = this.gini(y) - (leftY.length / y.length) * this.gini(leftY) - (rightY.length / y.length) * this.gini(rightY);
+        // Variance reduction (how much MSE decreases)
+        const parentVar = this.variance(y);
+        const leftVar = this.variance(leftY);
+        const rightVar = this.variance(rightY);
+        const gain = parentVar - (leftY.length / y.length) * leftVar - (rightY.length / y.length) * rightVar;
         if (gain > bestGain) { bestGain = gain; bestFeature = f; bestThreshold = thresh; }
       }
     }
@@ -114,11 +142,12 @@ class DecisionTree {
   }
 
   private build(X: number[][], y: number[], depth: number): DTNode {
-    if (depth >= this.maxDepth || y.length < this.minSamples || new Set(y).size === 1) {
+    const variance = this.variance(y);
+    if (depth >= this.maxDepth || y.length < this.minSamples || variance <= 1e-6) {
       return { value: this.mean(y) };
     }
     const split = this.bestSplit(X, y);
-    if (split.gain <= 0) return { value: this.mean(y) };
+    if (split.gain <= 0 || !isFinite(split.gain)) return { value: this.mean(y) };
     const leftMask = X.map(x => x[split.feature] <= split.threshold);
     const leftX = X.filter((_, i) => leftMask[i]);
     const leftY = y.filter((_, i) => leftMask[i]);
@@ -158,8 +187,13 @@ class RandomForest {
   }
 
   private bootstrap(X: number[][], y: number[]): { X: number[][]; y: number[] } {
-    const n = Math.floor(X.length * this.sampleRatio);
-    const idxs = Array.from({ length: n }, () => Math.floor(Math.random() * X.length));
+    const n = Math.max(1, Math.floor(X.length * this.sampleRatio));
+    // Use seeded RNG per-bootstrap for reproducibility
+    const rand = mulberry32(DEFAULT_SEED + 1);
+    const idxs: number[] = [];
+    for (let i = 0; i < n; i++) {
+      idxs.push(Math.floor(rand() * X.length));
+    }
     return { X: idxs.map(i => X[i]), y: idxs.map(i => y[i]) };
   }
 
@@ -223,28 +257,34 @@ export function trainModels(data: MLDataPoint[]): ModelMetrics[] {
   if (data.length < 5) {
     return getDefaultMetrics();
   }
-
   const X = data.map(encodeFeatures);
   const yReg = data.map(d => d.retentionScore / 100);
-  const yCls = data.map(d => d.retentionScore >= 60 ? 1 : 0);
+  const yCls = data.map(d => d.retentionScore >= 0.6 ? 1 : 0);
 
-  // Split 80/20
-  const splitIdx = Math.floor(X.length * 0.8);
-  const Xtrain = X.slice(0, splitIdx);
-  const Xtest = X.slice(splitIdx);
-  const yRegTrain = yReg.slice(0, splitIdx);
-  const yRegTest = yReg.slice(splitIdx);
-  const yClsTrain = yCls.slice(0, splitIdx);
-  const yClsTest = yCls.slice(splitIdx);
+  // Reproducible randomized split (80/20)
+  const n = X.length;
+  const idxs = Array.from({ length: n }, (_, i) => i);
+  const shuffledIdx = seededShuffle(idxs, DEFAULT_SEED);
+  const splitIdx = Math.floor(n * 0.8);
+  const trainIdx = shuffledIdx.slice(0, splitIdx);
+  const testIdx = shuffledIdx.slice(splitIdx);
+
+  const Xtrain = trainIdx.map(i => X[i]);
+  const Xtest = testIdx.map(i => X[i]);
+  const yRegTrain = trainIdx.map(i => yReg[i]);
+  const yRegTest = testIdx.map(i => yReg[i]);
+  const yClsTrain = trainIdx.map(i => yCls[i]);
+  const yClsTest = testIdx.map(i => yCls[i]);
 
   if (Xtrain.length === 0 || Xtest.length === 0) return getDefaultMetrics();
 
-  // Train
+  // Train logistic regression for classification (risk)
   const lr = new LogisticRegression();
   lr.train(Xtrain, yClsTrain);
   trainedLR = lr;
 
-  const dt = new DecisionTree(5, 2);
+  // Train regression tree and random forest for numeric retention prediction
+  const dt = new DecisionTree(6, 3);
   dt.train(Xtrain, yRegTrain);
   trainedDT = dt;
 
@@ -253,30 +293,36 @@ export function trainModels(data: MLDataPoint[]): ModelMetrics[] {
   trainedRF = rf;
 
   // Evaluate
-  const lrPred = Xtest.map(x => lr.predictProb(x));
+  const lrPredProb = Xtest.map(x => lr.predictProb(x));
   const dtPred = Xtest.map(x => dt.predict(x));
   const rfPred = Xtest.map(x => rf.predict(x));
 
-  const lrCls = evaluateClassification(yClsTest, lrPred);
-  const lrReg = evaluateRegression(yRegTest, lrPred);
+  // Classification metrics for logistic regression
+  const lrCls = evaluateClassification(yClsTest, lrPredProb);
 
-  const dtCls = evaluateClassification(yClsTest, dtPred);
+  // Regression metrics for DT and RF
   const dtReg = evaluateRegression(yRegTest, dtPred);
-
-  const rfCls = evaluateClassification(yClsTest, rfPred);
   const rfReg = evaluateRegression(yRegTest, rfPred);
 
+  // Also compute a coarse classification view for regression models (threshold at 0.6)
+  const dtCls = evaluateClassification(yClsTest, dtPred);
+  const rfCls = evaluateClassification(yClsTest, rfPred);
+
   const metrics: ModelMetrics[] = [
-    { name: "Logistic Regression", ...lrCls, ...lrReg },
-    { name: "Decision Tree", ...dtCls, ...dtReg },
-    { name: "Random Forest", ...rfCls, ...rfReg },
+    { name: "Logistic Regression", accuracy: lrCls.accuracy, precision: lrCls.precision, recall: lrCls.recall, f1Score: lrCls.f1Score, mae: 0, rmse: 0, r2: 0 },
+    { name: "Decision Tree", accuracy: dtCls.accuracy, precision: dtCls.precision, recall: dtCls.recall, f1Score: dtCls.f1Score, mae: dtReg.mae, rmse: dtReg.rmse, r2: dtReg.r2 },
+    { name: "Random Forest", accuracy: rfCls.accuracy, precision: rfCls.precision, recall: rfCls.recall, f1Score: rfCls.f1Score, mae: rfReg.mae, rmse: rfReg.rmse, r2: rfReg.r2 },
   ];
 
-  // Select best by F1
-  const best = metrics.reduce((b, m) => m.f1Score > b.f1Score ? m : b);
-  if (best.name.includes("Logistic")) bestModel = "LR";
-  else if (best.name.includes("Decision")) bestModel = "DT";
-  else bestModel = "RF";
+  // Select best regression model by RMSE (lower is better). Prefer RF over DT on tie.
+  const regModels = metrics.filter(m => m.name !== "Logistic Regression");
+  let bestReg = regModels[0];
+  for (const m of regModels) {
+    if ((m.rmse ?? Infinity) < (bestReg.rmse ?? Infinity)) bestReg = m;
+  }
+  if (bestReg.name.includes("Random")) bestModel = "RF";
+  else if (bestReg.name.includes("Decision")) bestModel = "DT";
+  else bestModel = "LR";
 
   cachedMetrics = metrics;
   return metrics;

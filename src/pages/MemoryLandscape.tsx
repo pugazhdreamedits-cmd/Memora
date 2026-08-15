@@ -23,7 +23,6 @@ export default function MemoryLandscape() {
   if (!user) return null;
 
   const topics = profile?.topicProfiles ?? [];
-
   if (topics.length === 0) {
     return (
       <div className="p-6 lg:p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -34,6 +33,8 @@ export default function MemoryLandscape() {
       </div>
     );
   }
+  // Insufficient data state: topics exist but retention scores are all zero
+  const insufficientData = topics.length > 0 && topics.every(t => (t.retentionScore ?? 0) <= 0);
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl mx-auto">
@@ -44,24 +45,53 @@ export default function MemoryLandscape() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Landscape Canvas */}
-        <div className="lg:col-span-2 glass-elevated rounded-2xl p-6 min-h-[420px]">
-          <div className="flex flex-wrap gap-8 items-end justify-around py-6">
-            {topics.map(t => (
-              <div key={t.topic} className="flex flex-col items-center gap-3">
-                <TopicNode topic={t} onClick={() => setSelected(t)} selected={selected?.topic === t.topic} />
-                <div className="text-center">
-                  <p className="text-xs font-semibold text-text-primary max-w-[90px] truncate">{t.topic}</p>
-                  <p className="text-xs text-text-muted truncate max-w-[90px]">{t.subject}</p>
-                </div>
+        <div className="lg:col-span-2 glass-elevated rounded-2xl p-6 min-h-[420px] relative overflow-hidden">
+          {/* Map area: positioned nodes within a responsive container */}
+          <div className="w-full h-[420px] relative" aria-hidden={insufficientData}>
+            {insufficientData && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                <Map className="w-10 h-10 text-text-muted mb-3" />
+                <h3 className="text-lg font-semibold text-text-primary">Memory map is forming</h3>
+                <p className="text-text-secondary max-w-xs">We need more study and recall activity to visualize topic relationships. Complete sessions to populate your landscape.</p>
               </div>
-            ))}
+            )}
+
+            {!insufficientData && (
+              <div className="absolute inset-0">
+                {/* compute simple deterministic positions based on index + retention */}
+                {topics.map((t, i) => {
+                  const angle = (i / topics.length) * Math.PI * 2;
+                  // radius scaled by retention (higher retention => closer to center)
+                  const baseR = 90 + (Math.max(0, 100 - (t.retentionScore ?? 50)) * 0.9);
+                  const cx = `calc(50% + ${Math.round(Math.cos(angle) * baseR)}px)`;
+                  const cy = `calc(50% + ${Math.round(Math.sin(angle) * baseR)}px)`;
+                  return (
+                    <div key={t.topic} style={{ position: 'absolute', left: cx, top: cy, transform: 'translate(-50%, -50%)' }}>
+                      <div className="flex flex-col items-center gap-2">
+                        <TopicNode
+                          topic={t}
+                          onClick={() => setSelected(t)}
+                          selected={selected?.topic === t.topic}
+                        />
+                        <div className="text-center">
+                          <p className="text-xs font-semibold text-text-primary max-w-[120px] truncate" style={{ maxWidth: 120 }}>{t.topic}</p>
+                          <p className="text-xs text-text-muted truncate max-w-[120px]">{t.subject}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+          {/* Legend */}
           {/* Legend */}
           <div className="mt-4 pt-4 border-t border-border-subtle flex flex-wrap gap-4 text-xs text-text-muted">
             <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-status-success" /> HIGH retention (80–100%)</div>
             <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-status-warning" /> MEDIUM (50–79%)</div>
             <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-status-danger" /> HIGH RISK (&lt;50%) · pulsing</div>
           </div>
+
         </div>
 
         {/* Detail Panel */}

@@ -2,9 +2,10 @@ import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { RefreshCw, Zap, ArrowRight, Check } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useAuth";
-import { RetentionStore, StudyStore, QuizStore } from "@/lib/storage";
+import { RetentionStore, StudyStore, QuizStore, MLStore } from "@/lib/storage";
 import { getQuizQuestions, scoreQuiz } from "@/lib/quizData";
-import { quizToRetention } from "@/lib/retention";
+import { quizToRetention, calcRevisionEffectiveness } from "@/lib/retention";
+import { predictRetention } from "@/lib/ml";
 import type { QuizAttempt, RetentionRecord, QuizQuestion } from "@/types";
 import { generateId, getRiskLevel, round, cn, getRiskColor } from "@/lib/utils";
 import RetentionBadge from "@/components/features/RetentionBadge";
@@ -24,6 +25,10 @@ export default function RecoveryMode() {
   const [confirmed, setConfirmed] = useState(false);
   const [beforeScore, setBeforeScore] = useState(0);
   const [afterScore, setAfterScore] = useState(0);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizAccuracy, setQuizAccuracy] = useState(0);
+  const [timeTakenState, setTimeTakenState] = useState(0);
+  const [recommendedNext, setRecommendedNext] = useState<number | null>(null);
   const [startTime] = useState(Date.now());
 
   const riskTopics = useMemo(() => {
@@ -65,6 +70,9 @@ export default function RecoveryMode() {
         const scored = scoreQuiz(questions, newAnswers);
         const retention = quizToRetention(scored.score, 0, beforeScore);
         setAfterScore(round(retention));
+        setQuizScore(scored.score);
+        setQuizAccuracy(scored.accuracy);
+        setTimeTakenState(timeTaken);
 
         if (user && selectedRec) {
           const attempt: QuizAttempt = {
@@ -95,6 +103,33 @@ export default function RecoveryMode() {
           };
           RetentionStore.save(updated);
           toast.success("Memory updated after recovery session!");
+          // Compute recommended next revision using ML prediction if possible
+          try {
+            const session = StudyStore.getById(selectedRec.sessionId);
+            const historical = MLStore.getByUser(user.id);
+            const diffMap: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
+            const methodMap: Record<string, number> = { Reading: 0, Practice: 1, Video: 2, Notes: 3, Flashcards: 4, "Problem Solving": 5 };
+            const pred = predictRetention({
+              studentId: user.id,
+              subject: updated.subject,
+              topic: updated.topic,
+              studyDuration: session?.studyDuration ?? 30,
+              difficulty: diffMap[session?.difficulty ?? 'Medium'] ?? 1,
+              studyMethod: methodMap[session?.studyMethod ?? 'Practice'] ?? 0,
+              initialScore: session?.initialScore ?? 75,
+              revisionCount: session?.revisionCount ?? 0,
+              daysSinceStudy: updated.daysSinceStudy,
+              previousRetention: updated.retentionScore,
+              quizScore: scored.score,
+              quizAccuracy: scored.accuracy,
+              quizTime: Math.max(30, timeTaken),
+              retentionScore: updated.retentionScore,
+              forgettingRisk: updated.retentionScore >= 80 ? 0 : updated.retentionScore >= 50 ? 1 : 2,
+            }, historical);
+            setRecommendedNext(pred.recommendedRevisionDays);
+          } catch (e) {
+            // ignore prediction errors — recommendation is optional
+          }
         }
         setPhase("done");
       }
@@ -178,6 +213,21 @@ export default function RecoveryMode() {
 
   if (phase === "quiz" && selectedRec && questions.length > 0) {
     const q = questions[current];
+    // Keyboard accessibility: 1-4 to select options, Enter to confirm
+    React.useEffect(() => {
+      function onKey(e: KeyboardEvent) {
+        if (phase !== 'quiz') return;
+        const k = e.key;
+        if (/^[1-9]$/.test(k)) {
+          const idx = parseInt(k, 10) - 1;
+          if (idx >= 0 && idx < q.options.length) handleSelect(idx);
+        } else if (k === 'Enter') {
+          handleConfirm();
+        }
+      }
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, [phase, q, selected, confirmed]);
     return (
       <div className="p-6 lg:p-8 max-w-2xl mx-auto">
         <div className="mb-6">
@@ -193,7 +243,7 @@ export default function RecoveryMode() {
           </div>
         </div>
         <div className="glass-elevated rounded-2xl p-6 mb-4">
-          <p className="text-text-primary font-medium leading-relaxed mb-6">{q.text}</p>
+              <p className="text-text-primary font-medium leading-relaxed mb-6">{q.text}</p>
           <div className="space-y-2">
             {q.options.map((opt, i) => {
               let cls = "border-border-default text-text-secondary hover:border-brand-primary/40 hover:text-text-primary";
@@ -212,10 +262,14 @@ export default function RecoveryMode() {
             })}
           </div>
         </div>
-        <button onClick={handleConfirm} disabled={selected === null || confirmed}
-          className="btn-primary w-full py-3.5 disabled:opacity-50 disabled:cursor-not-allowed">
-          {confirmed ? (current + 1 < questions.length ? "Next" : "Finish") : "Confirm"}
-        </button>
+        <div className="flex gap-3">
+          <button onClick={handleConfirm} disabled={selected === null || confirmed}
+            className="btn-primary flex-1 py-3.5 disabled:opacity-50 disabled:cursor-not-allowed">
+            {confirmed ? (current + 1 < questions.length ? "Next" : "Finish") : "Confirm"}
+          </button>
+          <button onClick={() => { setPhase('select'); setCurrent(0); setAnswers([]); setSelected(null); }}
+            className="btn-ghost py-3.5">Cancel</button>
+        </div>
       </div>
     );
   }
@@ -245,11 +299,36 @@ export default function RecoveryMode() {
         <h2 className="text-2xl font-bold text-text-primary mb-2">
           {improved ? "Memory Restored!" : "Keep Practicing"}
         </h2>
-        <p className="text-text-secondary mb-6 text-sm">
+        <p className="text-text-secondary mb-4 text-sm">
           {improved
             ? `Your retention improved from ${beforeScore}% to ${afterScore}%. The memory node has been updated.`
             : `Retention stayed at ${afterScore}%. Consider reviewing the study material again.`}
         </p>
+        <div className="w-full glass-elevated rounded-2xl p-4 mb-4 text-left">
+          <div className="flex justify-between mb-2">
+            <span className="text-xs text-text-muted">Quiz score</span>
+            <span className="font-mono">{quizScore}%</span>
+          </div>
+          <div className="flex justify-between mb-2">
+            <span className="text-xs text-text-muted">Accuracy</span>
+            <span className="font-mono">{Math.round(quizAccuracy * 100)}%</span>
+          </div>
+          <div className="flex justify-between mb-2">
+            <span className="text-xs text-text-muted">Questions answered</span>
+            <span className="font-mono">{answers.length}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-xs text-text-muted">Time</span>
+            <span className="font-mono">{timeTakenState}s</span>
+          </div>
+        </div>
+        <div className="w-full glass-elevated rounded-2xl p-4 mb-4 text-left">
+          <div className="flex justify-between mb-2">
+            <span className="text-xs text-text-muted">Recommended next revision</span>
+            <span className="font-mono">{recommendedNext === null ? "—" : (recommendedNext === 0 ? "Now" : `${recommendedNext}d`)}</span>
+          </div>
+          <div className="text-xs text-text-muted">{recommendedNext === null ? "Recommendation unavailable." : `Model suggests revising ${recommendedNext === 0 ? 'now' : `within ${recommendedNext} day(s)`}.`}</div>
+        </div>
         <div className="flex gap-3 w-full">
           <button onClick={() => { setPhase("select"); setCurrent(0); setAnswers([]); setSelected(null); }}
             className="btn-secondary flex-1">New Recovery</button>

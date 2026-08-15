@@ -21,6 +21,8 @@ const History = lazy(() => import("@/pages/History"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const QuestionLab = lazy(() => import("@/pages/QuestionLab"));
+const QuestionLabTake = lazy(() => import("@/pages/QuestionLabTake"));
 
 const Loader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -36,6 +38,8 @@ function ProtectedApp() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/study" element={<StudySession />} />
           <Route path="/quiz" element={<Quiz />} />
+          <Route path="/question-lab" element={<QuestionLab />} />
+          <Route path="/question-lab/take" element={<QuestionLabTake />} />
           <Route path="/landscape" element={<MemoryLandscape />} />
           <Route path="/dna" element={<MemoryDNA />} />
           <Route path="/forecast" element={<RetentionForecast />} />

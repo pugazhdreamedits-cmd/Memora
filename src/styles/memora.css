@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+
+:root {
+  /* MEMORA Design Tokens */
+  --memora-bg: #07080b; /* near-black charcoal */
+  --memora-surface: rgba(13,17,23,0.9); /* dark translucent surface */
+  --memora-elevated: rgba(19,25,35,0.95);
+  --memora-border: rgba(36,52,71,0.6);
+
+  --brand-primary: 99 102 241; /* electric violet (H S L) stored as rgb components for Tailwind) */
+  --brand-primary-hex: #6366F1;
+  --brand-primary-light-hex: #818CF8;
+  --brand-secondary-hex: #22D3EE; /* cyan */
+
+  --text-primary: #F1F5F9;
+  --text-muted: #94A3B8;
+  --text-dim: #334155;
+
+  --status-success: #10B981;
+  --status-warning: #F59E0B;
+  --status-danger: #EF4444;
+
+  --glass-blur: 8px;
+  --radius: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .glow-border-primary, .pulse, .orbit { animation: none !important; }
+}
+
+/* Apply base typography and background */
+html, body, #root {
+  height: 100%;
+}
+body {
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  background: radial-gradient(ellipse at 10% 10%, rgba(99,102,241,0.06) 0%, transparent 20%), linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.7));
+  background-color: var(--memora-bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Utility surface classes bridging Tailwind tokens and CSS tokens */
+.bg-memora-base { background-color: var(--memora-bg) !important; }
+.bg-memora-surface { background-color: var(--memora-surface) !important; }
+.bg-memora-elevated { background-color: var(--memora-elevated) !important; }
+.border-memora { border-color: var(--memora-border) !important; }
+
+/* Subtle glow helpers */
+.glow-primary { box-shadow: 0 6px 30px rgba(99,102,241,0.10); }
+.glow-accent { box-shadow: 0 6px 30px rgba(34,211,238,0.06); }
+
+/* Header and navigation tweaks */
+.memora-logo { font-weight: 700; letter-spacing: 0.06em; }
+.memora-logo .accent { background: linear-gradient(90deg, var(--brand-primary-light-hex), var(--brand-secondary-hex)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Glass surfaces */
+.glass-panel { background: rgba(10,12,15,0.6); backdrop-filter: blur(var(--glass-blur)); border: 1px solid rgba(36,52,71,0.35); border-radius: var(--radius); }
+.glass-elevated { background: rgba(14,16,20,0.7); backdrop-filter: blur(calc(var(--glass-blur) + 2px)); border: 1px solid rgba(99,102,241,0.06); border-radius: calc(var(--radius) + 4px); }
+
+/* Small accessibility helpers */
+:focus { outline: 2px solid rgba(99,102,241,0.12); outline-offset: 2px; }
+
+/* Improve keyboard focus visuals for accessibility */
+:focus-visible { outline: 3px solid rgba(99,102,241,0.18); outline-offset: 3px; box-shadow: 0 0 0 4px rgba(99,102,241,0.06); }
+
+/* Lightweight motion for subtle UI */
+@keyframes subtlePulse { 0% { transform: scale(0.998); opacity: 0.95 } 50% { transform: scale(1.002); opacity: 1 } 100% { transform: scale(0.998); opacity: 0.95 } }
+.pulse-slow { animation: subtlePulse 3s ease-in-out infinite; }
+
+/* Small helpers to preserve existing classnames used in app */
+.gradient-text { background: linear-gradient(90deg, var(--brand-primary-hex), var(--brand-primary-light-hex), var(--brand-secondary-hex)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Ensure reduced-motion respects user preference for heavy effects */
+@media (prefers-reduced-motion: reduce) {
+  .pulse-slow { animation: none !important; }
+}
